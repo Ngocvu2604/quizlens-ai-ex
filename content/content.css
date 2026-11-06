@@ -1,0 +1,227 @@
+/* QuizLens AI - Content Script Injected Styles */
+
+:root {
+  --ql-bg: #F8FAFC;
+  --ql-surface: #FFFFFF;
+  --ql-primary: #2563EB;
+  --ql-primary-hover: #1D4ED8;
+  --ql-text-main: #0F172A;
+  --ql-text-secondary: #64748B;
+  --ql-border: #E2E8F0;
+  --ql-success: #16A34A;
+  --ql-error: #DC2626;
+  --ql-radius: 8px;
+  --ql-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+#quizlens-root-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2147483647; /* Top-most layer */
+  pointer-events: none;
+}
+
+.quizlens-popup {
+  position: absolute;
+  pointer-events: auto;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  background: var(--ql-surface);
+  border: 1px solid var(--ql-border);
+  border-radius: var(--ql-radius);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  font-family: var(--ql-font);
+  color: var(--ql-text-main);
+  box-sizing: border-box;
+  overflow: hidden;
+  animation: qlFadeIn 0.15s ease-out;
+}
+
+@keyframes qlFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.quizlens-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--ql-bg);
+  border-bottom: 1px solid var(--ql-border);
+}
+
+.quizlens-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--ql-primary);
+  text-transform: uppercase;
+}
+
+.quizlens-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--ql-text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.quizlens-close-btn:hover {
+  color: var(--ql-text-main);
+  background: #E2E8F0;
+}
+
+.quizlens-body {
+  padding: 12px;
+}
+
+/* Loading state */
+.quizlens-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.quizlens-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ql-border);
+  border-top-color: var(--ql-primary);
+  border-radius: 50%;
+  animation: qlSpin 0.7s linear infinite;
+}
+
+@keyframes qlSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.quizlens-loading-text {
+  font-size: 13px;
+  color: var(--ql-text-secondary);
+  font-weight: 500;
+}
+
+/* Result success state */
+.quizlens-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quizlens-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ql-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.quizlens-answer-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.quizlens-letter-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--ql-primary);
+  color: #FFFFFF;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.quizlens-answer-text {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ql-text-main);
+  font-weight: 500;
+  word-break: break-word;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.quizlens-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--ql-border);
+  font-size: 12px;
+}
+
+.quizlens-confidence {
+  color: var(--ql-text-secondary);
+}
+
+.quizlens-copy-btn {
+  background: var(--ql-bg);
+  border: 1px solid var(--ql-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ql-text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quizlens-copy-btn:hover {
+  background: #E2E8F0;
+  border-color: #CBD5E1;
+}
+
+.quizlens-copy-btn.copied {
+  background: #DCFCE7;
+  color: var(--ql-success);
+  border-color: #86EFAC;
+}
+
+/* Unknown / Warning state */
+.quizlens-unknown, .quizlens-error {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 4px 0;
+}
+
+.quizlens-unknown-title {
+  font-weight: 600;
+  color: var(--ql-text-main);
+}
+
+.quizlens-unknown-desc {
+  color: var(--ql-text-secondary);
+  font-size: 12px;
+}
+
+.quizlens-error-desc {
+  color: var(--ql-error);
+  font-size: 12px;
+}
+

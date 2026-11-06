@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuizLens AI</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span class="brand-title">QuizLens AI</span>
+      </div>
+      <div class="status-badge" id="statusBadge">Sẵn sàng</div>
+    </header>
+
+    <!-- Master Switch -->
+    <section class="section toggle-section">
+      <div class="toggle-info">
+        <span class="toggle-label">Tự động nhận diện</span>
+        <span class="toggle-sub">Phân tích ngay khi bôi đen</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enabledToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </section>
+
+    <!-- Configuration Form -->
+    <section class="section form-section">
+      <div class="form-group">
+        <label for="providerSelect" class="field-label">AI Provider</label>
+        <select id="providerSelect" class="select-field">
+          <option value="gemini">Google Gemini Flash (Khuyên dùng)</option>
+          <option value="groq">Groq Cloud (Siêu tốc độ)</option>
+          <option value="openrouter">OpenRouter Free (Dự phòng)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="modelSelect" class="field-label">Mô hình AI (Model)</label>
+        <select id="modelSelect" class="select-field">
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <div class="field-header">
+          <label for="apiKeyInput" class="field-label">API Key của bạn (Bắt buộc)</label>
+          <button type="button" id="toggleApiKeyVis" class="link-btn">Hiện</button>
+        </div>
+        <input type="password" id="apiKeyInput" class="input-field" placeholder="Dán API Key cá nhân vào đây..." />
+        <span class="field-hint" id="keyHint">
+          Chưa có key? Lấy miễn phí tại: 
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--ql-primary);">aistudio.google.com</a>
+        </span>
+      </div>
+
+      <div class="checkbox-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="autoCopyToggle">
+          <span>Tự động sao chép đáp án vào Clipboard</span>
+        </label>
+      </div>
+
+      <!-- Advanced Backend (Optional) -->
+      <details class="advanced-section" style="margin-top: 4px; font-size: 12px; color: var(--ql-text-secondary);">
+        <summary style="cursor: pointer; padding: 4px 0; font-weight: 500;">Tùy chọn Backend nâng cao</summary>
+        <div class="form-group" style="margin-top: 8px;">
+          <label for="backendUrl" class="field-label">Địa chỉ Backend API (Nếu có)</label>
+          <input type="text" id="backendUrl" class="input-field" placeholder="https://quizlens-ai-omega.vercel.app" />
+        </div>
+      </details>
+    </section>
+
+    <!-- Connection & Actions -->
+    <footer class="footer">
+      <div class="btn-group">
+        <button type="button" id="testBtn" class="btn btn-secondary">Kiểm tra kết nối</button>
+        <button type="button" id="saveBtn" class="btn btn-primary">Lưu cấu hình</button>
+      </div>
+      <div class="feedback-msg" id="feedbackMsg"></div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

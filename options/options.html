@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cài đặt QuizLens AI</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="options-container">
+    <header class="options-header">
+      <div class="brand">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <h1>Cài đặt QuizLens AI</h1>
+      </div>
+      <p class="subtitle">Quản lý cấu hình AI Providers, Backend và hành vi nhận diện trắc nghiệm</p>
+    </header>
+
+    <main class="options-body">
+      <!-- General Settings Card -->
+      <section class="card">
+        <h2 class="card-title">Cấu hình chung</h2>
+        
+        <div class="form-row">
+          <label for="backendUrl" class="row-label">
+            <strong>Địa chỉ Backend URL</strong>
+            <span class="row-sub">Địa chỉ máy chủ Node.js Express của QuizLens AI</span>
+          </label>
+          <input type="text" id="backendUrl" class="input-text" placeholder="http://localhost:3000">
+        </div>
+
+        <div class="form-row">
+          <label for="debounceMs" class="row-label">
+            <strong>Thời gian chờ nhận diện (Debounce)</strong>
+            <span class="row-sub">Độ trễ sau khi thả chuột trước khi bắt đầu phân tích (ms)</span>
+          </label>
+          <input type="number" id="debounceMs" class="input-number" min="200" max="2000" step="50" value="400">
+        </div>
+
+        <div class="form-row">
+          <label class="row-label">
+            <strong>Tự động sao chép</strong>
+            <span class="row-sub">Tự động sao chép đáp án đúng vào clipboard khi có kết quả</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="autoCopy">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Provider Settings Card -->
+      <section class="card">
+        <h2 class="card-title">Cấu hình AI Providers (Free Tier)</h2>
+        <p class="card-desc">Cung cấp API key riêng của bạn để kết nối trực tiếp hoặc ghi đè cấu hình server.</p>
+
+        <!-- Gemini -->
+        <div class="provider-block">
+          <div class="provider-header">
+            <strong>Google Gemini (Chính)</strong>
+            <span class="badge badge-free">Free Quota</span>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label for="geminiModel" class="field-label">Mô hình</label>
+              <select id="geminiModel" class="select-field">
+                <option value="gemini-1.5-flash">gemini-1.5-flash (Khuyên dùng)</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+              </select>
+            </div>
+            <div>
+              <label for="geminiApiKey" class="field-label">Gemini API Key</label>
+              <input type="password" id="geminiApiKey" class="input-text" placeholder="AIzaSy...">
+            </div>
+          </div>
+        </div>
+
+        <!-- Groq -->
+        <div class="provider-block">
+          <div class="provider-header">
+            <strong>Groq Cloud (Dự phòng 1)</strong>
+            <span class="badge badge-free">Tốc độ cực nhanh</span>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label for="groqModel" class="field-label">Mô hình</label>
+              <select id="groqModel" class="select-field">
+                <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+                <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+                <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+              </select>
+            </div>
+            <div>
+              <label for="groqApiKey" class="field-label">Groq API Key</label>
+              <input type="password" id="groqApiKey" class="input-text" placeholder="gsk_...">
+            </div>
+          </div>
+        </div>
+
+        <!-- OpenRouter -->
+        <div class="provider-block">
+          <div class="provider-header">
+            <strong>OpenRouter Free (Dự phòng 2)</strong>
+            <span class="badge badge-free">Đa dạng mô hình</span>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label for="openrouterModel" class="field-label">Mô hình</label>
+              <select id="openrouterModel" class="select-field">
+                <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b-instruct:free</option>
+                <option value="google/gemini-2.0-flash-exp:free">google/gemini-2.0-flash-exp:free</option>
+                <option value="qwen/qwen-2.5-72b-instruct:free">qwen/qwen-2.5-72b-instruct:free</option>
+              </select>
+            </div>
+            <div>
+              <label for="openrouterApiKey" class="field-label">OpenRouter API Key</label>
+              <input type="password" id="openrouterApiKey" class="input-text" placeholder="sk-or-...">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Security Notice Card -->
+      <section class="card security-card">
+        <h3 class="security-title">Bảo mật thông tin & API Key</h3>
+        <p class="security-desc">
+          Các API key bạn nhập được mã hóa và lưu trữ cục bộ trong thiết bị cá nhân thông qua cơ chế <code>chrome.storage.sync</code> của Google Chrome. QuizLens AI hoàn toàn không lưu trữ API key của bạn trên máy chủ trung gian hay chia sẻ cho bên thứ ba.
+        </p>
+      </section>
+    </main>
+
+    <footer class="options-footer">
+      <div class="footer-left">
+        <button type="button" id="resetBtn" class="btn btn-outline">Khôi phục mặc định</button>
+      </div>
+      <div class="footer-right">
+        <span id="saveStatus" class="save-status"></span>
+        <button type="button" id="saveOptionsBtn" class="btn btn-primary">Lưu thay đổi</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
+
