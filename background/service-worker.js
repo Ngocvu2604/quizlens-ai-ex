@@ -4,7 +4,7 @@ var DEFAULT_SETTINGS = {
   mode: "direct",
   backendUrl: "https://quizlens-ai-omega.vercel.app",
   activeProvider: "gemini",
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-2.0-flash",
   groqModel: "llama-3.3-70b-versatile",
   openrouterModel: "meta-llama/llama-3.3-70b-instruct:free",
   autoCopy: false,
@@ -140,9 +140,15 @@ async function solveWithGroqDirect(question, options, apiKey, modelName = "llama
     })
   });
   if (!response.ok) {
-    if (response.status === 401) throw new Error("Groq API Key kh\xF4ng h\u1EE3p l\u1EC7.");
-    if (response.status === 429) throw new Error("Groq API \u0111\u1EA1t gi\u1EDBi h\u1EA1n Rate Limit.");
-    throw new Error(`Groq Error (${response.status})`);
+    if (response.status === 401) throw new Error("Groq API Key kh\xF4ng h\u1EE3p l\u1EC7. Vui l\xF2ng ki\u1EC3m tra l\u1EA1i key t\u1EA1i console.groq.com");
+    if (response.status === 429) throw new Error("Groq API \u0111\u1EA1t gi\u1EDBi h\u1EA1n Rate Limit. Th\u1EED l\u1EA1i sau \xEDt ph\xFAt.");
+    let msg = `Groq Error (${response.status})`;
+    try {
+      const err = await response.json();
+      if (err?.error?.message) msg = `Groq: ${err.error.message}`;
+    } catch (_) {
+    }
+    throw new Error(msg);
   }
   const data = await response.json();
   const text = data.choices?.[0]?.message?.content || "";
@@ -312,6 +318,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
               sendResponse({ success: false, data: { mode: "none" } });
             }
           }
+          break;
+        }
+        case "TEST_AI_KEY": {
+          const { provider, model, apiKey } = message.payload;
+          const dummyQuestion = "Th\u1EE7 \u0111\xF4 c\u1EE7a Vi\u1EC7t Nam l\xE0 g\xEC?";
+          const dummyOptions = { A: "H\xE0 N\u1ED9i", B: "TP.HCM" };
+          let res;
+          if (provider === "gemini") {
+            res = await solveWithGeminiDirect(dummyQuestion, dummyOptions, apiKey, model);
+          } else if (provider === "groq") {
+            res = await solveWithGroqDirect(dummyQuestion, dummyOptions, apiKey, model);
+          } else {
+            res = await solveWithOpenRouterDirect(dummyQuestion, dummyOptions, apiKey, model);
+          }
+          sendResponse({ success: true, data: res });
           break;
         }
         case "ANALYZE_QUESTION": {

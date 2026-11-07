@@ -1,5 +1,5 @@
 // src/content/dom-extractor.ts
-var EXPECTED_OPTIONS = ["A", "B", "C", "D"];
+var EXPECTED_OPTIONS = ["A", "B", "C", "D", "E"];
 function extractOptionsFromDOM(selectedQuestionText, range) {
   try {
     let startNode = range.commonAncestorContainer;
@@ -68,40 +68,42 @@ function extractFromStructuredElements(container, questionText) {
           }
         }
       }
-      if (foundOptions.A && foundOptions.B && foundOptions.C && foundOptions.D) {
+      if (foundOptions.A && foundOptions.B) {
         return {
           question: questionText.trim(),
           options: {
             A: foundOptions.A,
             B: foundOptions.B,
-            C: foundOptions.C,
-            D: foundOptions.D
+            ...foundOptions.C ? { C: foundOptions.C } : {},
+            ...foundOptions.D ? { D: foundOptions.D } : {},
+            ...foundOptions.E ? { E: foundOptions.E } : {}
           }
         };
       }
     }
   }
   const radioLabels = Array.from(container.querySelectorAll("label"));
-  if (radioLabels.length === 4) {
-    const letters = ["A", "B", "C", "D"];
+  if (radioLabels.length >= 2 && radioLabels.length <= 5) {
+    const letters = ["A", "B", "C", "D", "E"];
     const autoMapped = {};
     let allValid = true;
-    for (let i = 0; i < 4; i++) {
-      const text = normalizeText(radioLabels[i].innerText || radioLabels[i].textContent || "").replace(/^[A-Da-d][\)\].:\-]\s*/, "").trim();
+    for (let i = 0; i < radioLabels.length; i++) {
+      const text = normalizeText(radioLabels[i].innerText || radioLabels[i].textContent || "").replace(/^[A-Ea-e][\)\].:\-]\s*/, "").trim();
       if (!text) {
         allValid = false;
         break;
       }
       autoMapped[letters[i]] = text;
     }
-    if (allValid && autoMapped.A && autoMapped.B && autoMapped.C && autoMapped.D) {
+    if (allValid && autoMapped.A && autoMapped.B) {
       return {
         question: questionText.trim(),
         options: {
           A: autoMapped.A,
           B: autoMapped.B,
-          C: autoMapped.C,
-          D: autoMapped.D
+          ...autoMapped.C ? { C: autoMapped.C } : {},
+          ...autoMapped.D ? { D: autoMapped.D } : {},
+          ...autoMapped.E ? { E: autoMapped.E } : {}
         }
       };
     }
@@ -137,10 +139,10 @@ ${collectedTextLines.join("\n")}`;
 
 // src/content/question-detector.ts
 var EXPECTED_OPTIONS2 = ["A", "B", "C", "D", "E"];
-var OPTION_PREFIX_REGEX = /(?:^|[\r\n]+|\s{2,}|\t)(?:[\(\[]?([A-Da-d])[\)\].:\-]\s*)/g;
+var OPTION_PREFIX_REGEX = /(?:^|[\r\n]+|[•\*\-\–\—\+·]\s*|\s{2,}|\t)(?:[\(\[]?([A-Ea-e])[\)\].:\-]\s*)|(?:\s+)([A-Ea-e])[\.:\-]\s*/g;
 function normalizeText(text) {
   if (!text) return "";
-  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  return text.replace(/\u00a0/g, " ").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 }
 function isDisqualifiedNonQuestion(text) {
   const trimmed = text.trim();
@@ -161,7 +163,9 @@ function parseQuestionFromText(rawText) {
   const regex = new RegExp(OPTION_PREFIX_REGEX);
   let match;
   while ((match = regex.exec(text)) !== null) {
-    const letter = match[1].toUpperCase();
+    const rawLetter = match[1] || match[2];
+    if (!rawLetter) continue;
+    const letter = rawLetter.toUpperCase();
     const matchStart = match.index + (match[0].length - match[0].trimStart().length);
     matches.push({
       letter,
@@ -172,20 +176,25 @@ function parseQuestionFromText(rawText) {
   if (matches.length < 2) {
     return null;
   }
-  const letters = matches.map((m) => m.letter);
-  const uniqueLetters = new Set(letters);
+  const lastSeenIndexByLetter = /* @__PURE__ */ new Map();
+  for (let i = 0; i < matches.length; i++) {
+    lastSeenIndexByLetter.set(matches[i].letter, i);
+  }
+  const filteredIndices = new Set(lastSeenIndexByLetter.values());
+  const validMatches = matches.filter((_, idx) => filteredIndices.has(idx));
+  const uniqueLetters = new Set(validMatches.map((m) => m.letter));
   if (!uniqueLetters.has("A") || !uniqueLetters.has("B")) {
     return null;
   }
-  const firstOptionIndex = matches[0].index;
+  const firstOptionIndex = validMatches[0].index;
   const questionPart = text.slice(0, firstOptionIndex).trim();
   if (questionPart.length < 5) {
     return null;
   }
   const optionsMap = {};
-  for (let i = 0; i < matches.length; i++) {
-    const current = matches[i];
-    const next = matches[i + 1];
+  for (let i = 0; i < validMatches.length; i++) {
+    const current = validMatches[i];
+    const next = validMatches[i + 1];
     const startIndex = current.index + current.fullMatchLength;
     const endIndex = next ? next.index : text.length;
     const content = text.slice(startIndex, endIndex).trim();
@@ -398,7 +407,7 @@ var ResultPopup = class {
         <div class="quizlens-unknown">
           <div class="quizlens-unknown-title">Kh\xF4ng x\xE1c \u0111\u1ECBnh \u0111\u01B0\u1EE3c c\xE2u h\u1ECFi</div>
           <div class="quizlens-unknown-desc">
-            ${this.escapeHtml(reason || "Kh\xF4ng t\xECm th\u1EA5y \u0111\u1EE7 4 ph\u01B0\u01A1ng \xE1n A, B, C, D xung quanh v\xF9ng ch\u1ECDn.")}
+            ${this.escapeHtml(reason || "Kh\xF4ng t\xECm th\u1EA5y c\xE1c ph\u01B0\u01A1ng \xE1n l\u1EF1a ch\u1ECDn (A, B...) xung quanh v\xF9ng ch\u1ECDn.")}
           </div>
         </div>
       </div>
@@ -478,7 +487,7 @@ var DEFAULT_SETTINGS = {
   mode: "direct",
   backendUrl: "https://quizlens-ai-omega.vercel.app",
   activeProvider: "gemini",
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-2.0-flash",
   groqModel: "llama-3.3-70b-versatile",
   openrouterModel: "meta-llama/llama-3.3-70b-instruct:free",
   autoCopy: false,
@@ -512,10 +521,8 @@ var SelectionController = class {
     if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
       chrome.storage.onChanged.addListener((changes, area) => {
         if (area === "sync" || area === "local") {
-          for (const key of Object.keys(changes)) {
-            if (key in this.settings) {
-              this.settings[key] = changes[key].newValue;
-            }
+          if (changes.settings && changes.settings.newValue) {
+            this.settings = { ...DEFAULT_SETTINGS, ...changes.settings.newValue };
           }
         }
       });
@@ -607,10 +614,7 @@ var SelectionController = class {
           type: "ANALYZE_QUESTION",
           payload: {
             question: questionData.question,
-            options: questionData.options,
-            provider: this.settings.activeProvider,
-            model: this.getActiveModel(),
-            apiKey: this.getActiveApiKey()
+            options: questionData.options
           }
         },
         (response) => {
@@ -626,30 +630,6 @@ var SelectionController = class {
         }
       );
     });
-  }
-  getActiveModel() {
-    switch (this.settings.activeProvider) {
-      case "gemini":
-        return this.settings.geminiModel;
-      case "groq":
-        return this.settings.groqModel;
-      case "openrouter":
-        return this.settings.openrouterModel;
-      default:
-        return void 0;
-    }
-  }
-  getActiveApiKey() {
-    switch (this.settings.activeProvider) {
-      case "gemini":
-        return this.settings.geminiApiKey;
-      case "groq":
-        return this.settings.groqApiKey;
-      case "openrouter":
-        return this.settings.openrouterApiKey;
-      default:
-        return void 0;
-    }
   }
 };
 

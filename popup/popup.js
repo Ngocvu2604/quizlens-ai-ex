@@ -4,15 +4,15 @@ var DEFAULT_SETTINGS = {
   mode: "direct",
   backendUrl: "https://quizlens-ai-omega.vercel.app",
   activeProvider: "gemini",
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-2.0-flash",
   groqModel: "llama-3.3-70b-versatile",
   openrouterModel: "meta-llama/llama-3.3-70b-instruct:free",
   autoCopy: false,
   debounceMs: 400
 };
 var PROVIDER_MODELS = {
-  gemini: ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"],
-  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+  gemini: ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"],
+  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"],
   openrouter: [
     "meta-llama/llama-3.3-70b-instruct:free",
     "google/gemini-2.0-flash-exp:free",
@@ -23,7 +23,6 @@ var PROVIDER_MODELS = {
 // src/popup/popup.ts
 document.addEventListener("DOMContentLoaded", () => {
   const enabledToggle = document.getElementById("enabledToggle");
-  const backendUrlInput = document.getElementById("backendUrl");
   const providerSelect = document.getElementById("providerSelect");
   const modelSelect = document.getElementById("modelSelect");
   const apiKeyInput = document.getElementById("apiKeyInput");
@@ -35,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const feedbackMsg = document.getElementById("feedbackMsg");
   const keyHint = document.getElementById("keyHint");
   let currentSettings = { ...DEFAULT_SETTINGS };
+  let currentActiveProvider = "gemini";
   function updateModelOptions(provider, selectedModel) {
     const models = PROVIDER_MODELS[provider] || [];
     modelSelect.innerHTML = "";
@@ -77,22 +77,32 @@ document.addEventListener("DOMContentLoaded", () => {
   chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (response) => {
     if (response?.success && response.data) {
       currentSettings = { ...DEFAULT_SETTINGS, ...response.data };
+      currentActiveProvider = currentSettings.activeProvider || "gemini";
       enabledToggle.checked = currentSettings.enabled;
-      backendUrlInput.value = currentSettings.backendUrl;
-      providerSelect.value = currentSettings.activeProvider;
+      providerSelect.value = currentActiveProvider;
       autoCopyToggle.checked = currentSettings.autoCopy;
-      const activeModel = currentSettings.activeProvider === "gemini" ? currentSettings.geminiModel : currentSettings.activeProvider === "groq" ? currentSettings.groqModel : currentSettings.openrouterModel;
-      updateModelOptions(currentSettings.activeProvider, activeModel);
-      syncApiKeyField(currentSettings.activeProvider);
+      const activeModel = currentActiveProvider === "gemini" ? currentSettings.geminiModel : currentActiveProvider === "groq" ? currentSettings.groqModel : currentSettings.openrouterModel;
+      updateModelOptions(currentActiveProvider, activeModel);
+      syncApiKeyField(currentActiveProvider);
     }
   });
   providerSelect.addEventListener("change", () => {
-    const provider = providerSelect.value;
-    currentSettings.activeProvider = provider;
-    updateModelOptions(provider);
-    syncApiKeyField(provider);
+    const currentVal = apiKeyInput.value.trim();
+    if (currentActiveProvider === "gemini") currentSettings.geminiApiKey = currentVal;
+    else if (currentActiveProvider === "groq") currentSettings.groqApiKey = currentVal;
+    else if (currentActiveProvider === "openrouter") currentSettings.openrouterApiKey = currentVal;
+    const newProvider = providerSelect.value;
+    currentActiveProvider = newProvider;
+    currentSettings.activeProvider = newProvider;
+    const targetModel = newProvider === "gemini" ? currentSettings.geminiModel : newProvider === "groq" ? currentSettings.groqModel : currentSettings.openrouterModel;
+    updateModelOptions(newProvider, targetModel);
+    syncApiKeyField(newProvider);
   });
   apiKeyInput.addEventListener("input", () => {
+    const val = apiKeyInput.value.trim();
+    if (currentActiveProvider === "gemini") currentSettings.geminiApiKey = val;
+    else if (currentActiveProvider === "groq") currentSettings.groqApiKey = val;
+    else if (currentActiveProvider === "openrouter") currentSettings.openrouterApiKey = val;
     updateStatusBadge();
   });
   let isKeyVisible = false;
@@ -103,27 +113,34 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   testBtn.addEventListener("click", () => {
     const key = apiKeyInput.value.trim();
-    if (key.length > 5) {
-      statusBadge.textContent = "S\u1EB5n s\xE0ng";
-      statusBadge.className = "status-badge connected";
-      showFeedback("API Key \u0111\xE3 \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh v\xE0 s\u1EB5n s\xE0ng ho\u1EA1t \u0111\u1ED9ng tr\u1EF1c ti\u1EBFp!", "success");
+    if (!key || key.length < 5) {
+      statusBadge.textContent = "Ch\u01B0a c\xF3 Key";
+      statusBadge.className = "status-badge error";
+      showFeedback("Vui l\xF2ng d\xE1n API Key tr\u01B0\u1EDBc khi ki\u1EC3m tra!", "error");
       return;
     }
-    statusBadge.textContent = "\u0110ang ki\u1EC3m tra...";
+    testBtn.disabled = true;
+    testBtn.textContent = "\u0110ang ki\u1EC3m tra...";
+    statusBadge.textContent = "\u0110ang k\u1EBFt n\u1ED1i...";
     statusBadge.className = "status-badge";
-    feedbackMsg.textContent = "";
-    const targetUrl = backendUrlInput.value.trim() || DEFAULT_SETTINGS.backendUrl;
+    const provider = providerSelect.value;
+    const model = modelSelect.value;
     chrome.runtime.sendMessage(
-      { type: "TEST_CONNECTION", payload: { backendUrl: targetUrl } },
+      {
+        type: "TEST_AI_KEY",
+        payload: { provider, model, apiKey: key }
+      },
       (res) => {
+        testBtn.disabled = false;
+        testBtn.textContent = "Ki\u1EC3m tra k\u1EBFt n\u1ED1i";
         if (res?.success) {
-          statusBadge.textContent = "K\u1EBFt n\u1ED1i OK";
+          statusBadge.textContent = "\u0110\xE3 k\u1EBFt n\u1ED1i AI";
           statusBadge.className = "status-badge connected";
-          showFeedback("\u0110\xE3 k\u1EBFt n\u1ED1i v\u1EDBi m\xE1y ch\u1EE7!", "success");
+          showFeedback(`K\u1EBFt n\u1ED1i th\xE0nh c\xF4ng t\u1EDBi ${provider.toUpperCase()} (${model})!`, "success");
         } else {
-          statusBadge.textContent = "Ch\u01B0a c\xF3 Key";
+          statusBadge.textContent = "L\u1ED7i k\u1EBFt n\u1ED1i";
           statusBadge.className = "status-badge error";
-          showFeedback("Vui l\xF2ng d\xE1n API Key \u0111\u1EC3 s\u1EED d\u1EE5ng tr\u1EF1c ti\u1EBFp!", "error");
+          showFeedback(`L\u1ED7i: ${res?.error || "Kh\xF4ng k\u1EBFt n\u1ED1i \u0111\u01B0\u1EE3c"}`, "error");
         }
       }
     );
@@ -134,25 +151,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const apiKey = apiKeyInput.value.trim();
     const updated = {
       enabled: enabledToggle.checked,
-      backendUrl: backendUrlInput.value.trim() || DEFAULT_SETTINGS.backendUrl,
       activeProvider,
       autoCopy: autoCopyToggle.checked
     };
     if (activeProvider === "gemini") {
       updated.geminiModel = selectedModel;
       updated.geminiApiKey = apiKey;
+      currentSettings.geminiApiKey = apiKey;
+      currentSettings.geminiModel = selectedModel;
     } else if (activeProvider === "groq") {
       updated.groqModel = selectedModel;
       updated.groqApiKey = apiKey;
+      currentSettings.groqApiKey = apiKey;
+      currentSettings.groqModel = selectedModel;
     } else if (activeProvider === "openrouter") {
       updated.openrouterModel = selectedModel;
       updated.openrouterApiKey = apiKey;
+      currentSettings.openrouterApiKey = apiKey;
+      currentSettings.openrouterModel = selectedModel;
     }
     chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", payload: updated }, (res) => {
       if (res?.success) {
         currentSettings = { ...currentSettings, ...updated };
         updateStatusBadge();
-        showFeedback("\u0110\xE3 l\u01B0u c\u1EA5u h\xECnh th\xE0nh c\xF4ng!", "success");
+        const providerName = activeProvider === "groq" ? "Groq Cloud" : activeProvider === "gemini" ? "Google Gemini" : "OpenRouter";
+        showFeedback(`\u0110\xE3 l\u01B0u c\u1EA5u h\xECnh: ${providerName} (${selectedModel})!`, "success");
       } else {
         showFeedback("L\u1ED7i khi l\u01B0u c\u1EA5u h\xECnh.", "error");
       }
@@ -165,7 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (feedbackMsg.textContent === text) {
         feedbackMsg.textContent = "";
       }
-    }, 3e3);
+    }, 3500);
   }
 });
 //# sourceMappingURL=popup.js.map

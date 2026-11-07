@@ -4,7 +4,7 @@ var DEFAULT_SETTINGS = {
   mode: "direct",
   backendUrl: "https://quizlens-ai-omega.vercel.app",
   activeProvider: "gemini",
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-2.0-flash",
   groqModel: "llama-3.3-70b-versatile",
   openrouterModel: "meta-llama/llama-3.3-70b-instruct:free",
   autoCopy: false,
