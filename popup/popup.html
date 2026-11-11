@@ -39,7 +39,9 @@
         <select id="providerSelect" class="select-field">
           <option value="gemini">Google Gemini Flash (Khuyên dùng)</option>
           <option value="groq">Groq Cloud (Siêu tốc độ)</option>
-          <option value="openrouter">OpenRouter Free (Dự phòng)</option>
+          <option value="openai">OpenAI (ChatGPT)</option>
+          <option value="deepseek">DeepSeek AI (R1 & V3)</option>
+          <option value="openrouter">OpenRouter (Nhiều mô hình)</option>
         </select>
       </div>
 
@@ -52,10 +54,10 @@
 
       <div class="form-group">
         <div class="field-header">
-          <label for="apiKeyInput" class="field-label">API Key của bạn (Bắt buộc)</label>
+          <label for="apiKeyInput" class="field-label">API Key cá nhân (Tùy chọn)</label>
           <button type="button" id="toggleApiKeyVis" class="link-btn">Hiện</button>
         </div>
-        <input type="password" id="apiKeyInput" class="input-field" placeholder="Dán API Key cá nhân vào đây..." />
+        <input type="password" id="apiKeyInput" class="input-field" placeholder="Dán API Key cá nhân hoặc để trống..." />
         <span class="field-hint" id="keyHint">
           Chưa có key? Lấy miễn phí tại: 
           <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--ql-primary);">aistudio.google.com</a>

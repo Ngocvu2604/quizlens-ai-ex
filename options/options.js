@@ -1,11 +1,13 @@
 // src/shared/constants.ts
 var DEFAULT_SETTINGS = {
   enabled: true,
-  mode: "direct",
+  mode: "backend",
   backendUrl: "https://quizlens-ai-omega.vercel.app",
   activeProvider: "gemini",
   geminiModel: "gemini-2.0-flash",
   groqModel: "llama-3.3-70b-versatile",
+  openaiModel: "gpt-4o-mini",
+  deepseekModel: "deepseek-chat",
   openrouterModel: "meta-llama/llama-3.3-70b-instruct:free",
   autoCopy: false,
   debounceMs: 400

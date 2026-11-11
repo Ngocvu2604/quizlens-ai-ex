@@ -484,11 +484,13 @@ var ResultPopup = class {
 // src/shared/constants.ts
 var DEFAULT_SETTINGS = {
   enabled: true,
-  mode: "direct",
+  mode: "backend",
   backendUrl: "https://quizlens-ai-omega.vercel.app",
   activeProvider: "gemini",
   geminiModel: "gemini-2.0-flash",
   groqModel: "llama-3.3-70b-versatile",
+  openaiModel: "gpt-4o-mini",
+  deepseekModel: "deepseek-chat",
   openrouterModel: "meta-llama/llama-3.3-70b-instruct:free",
   autoCopy: false,
   debounceMs: 400
@@ -599,36 +601,52 @@ var SelectionController = class {
       }
     } catch (error) {
       this.isProcessing = false;
-      const message = error?.message || "L\u1ED7i k\u1EBFt n\u1ED1i \u0111\u1EBFn Backend ho\u1EB7c AI Provider.";
+      let message = error?.message || "L\u1ED7i k\u1EBFt n\u1ED1i \u0111\u1EBFn Backend ho\u1EB7c AI Provider.";
+      if (message.includes("Extension context invalidated") || typeof chrome !== "undefined" && !chrome.runtime?.id) {
+        message = "Ti\u1EC7n \xEDch v\u1EEBa \u0111\u01B0\u1EE3c n\u1EA1p l\u1EA1i phi\xEAn b\u1EA3n m\u1EDBi. Vui l\xF2ng b\u1EA5m F5 (T\u1EA3i l\u1EA1i trang web n\xE0y) \u0111\u1EC3 ti\u1EBFp t\u1EE5c gi\u1EA3i \u0111\u1EC1!";
+      }
       this.popup.showError(message, rect);
     }
   }
   requestAnswer(questionData) {
     return new Promise((resolve, reject) => {
-      if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-        reject(new Error("Chrome Extension API kh\xF4ng kh\u1EA3 d\u1EE5ng"));
-        return;
-      }
-      chrome.runtime.sendMessage(
-        {
-          type: "ANALYZE_QUESTION",
-          payload: {
-            question: questionData.question,
-            options: questionData.options
-          }
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message || "L\u1ED7i g\u1EEDi tin nh\u1EAFn n\u1ED9i b\u1ED9"));
-            return;
-          }
-          if (!response || !response.success) {
-            reject(new Error(response?.error || "L\u1ED7i t\u1EEB m\xE1y ch\u1EE7 QuizLens AI"));
-            return;
-          }
-          resolve(response.data);
+      try {
+        if (typeof chrome === "undefined" || !chrome.runtime?.id || !chrome.runtime?.sendMessage) {
+          reject(new Error("Ti\u1EC7n \xEDch v\u1EEBa \u0111\u01B0\u1EE3c n\u1EA1p l\u1EA1i phi\xEAn b\u1EA3n m\u1EDBi. Vui l\xF2ng b\u1EA5m F5 (T\u1EA3i l\u1EA1i trang web n\xE0y) \u0111\u1EC3 ti\u1EBFp t\u1EE5c gi\u1EA3i \u0111\u1EC1!"));
+          return;
         }
-      );
+        chrome.runtime.sendMessage(
+          {
+            type: "ANALYZE_QUESTION",
+            payload: {
+              question: questionData.question,
+              options: questionData.options
+            }
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              const errMsg = chrome.runtime.lastError.message || "";
+              if (errMsg.includes("Extension context invalidated")) {
+                reject(new Error("Ti\u1EC7n \xEDch v\u1EEBa \u0111\u01B0\u1EE3c n\u1EA1p l\u1EA1i phi\xEAn b\u1EA3n m\u1EDBi. Vui l\xF2ng b\u1EA5m F5 (T\u1EA3i l\u1EA1i trang web n\xE0y) \u0111\u1EC3 ti\u1EBFp t\u1EE5c gi\u1EA3i \u0111\u1EC1!"));
+              } else {
+                reject(new Error(errMsg || "L\u1ED7i g\u1EEDi tin nh\u1EAFn n\u1ED9i b\u1ED9"));
+              }
+              return;
+            }
+            if (!response || !response.success) {
+              reject(new Error(response?.error || "L\u1ED7i t\u1EEB m\xE1y ch\u1EE7 QuizLens AI"));
+              return;
+            }
+            resolve(response.data);
+          }
+        );
+      } catch (err) {
+        if (err?.message?.includes("Extension context invalidated")) {
+          reject(new Error("Ti\u1EC7n \xEDch v\u1EEBa \u0111\u01B0\u1EE3c n\u1EA1p l\u1EA1i phi\xEAn b\u1EA3n m\u1EDBi. Vui l\xF2ng b\u1EA5m F5 (T\u1EA3i l\u1EA1i trang web n\xE0y) \u0111\u1EC3 ti\u1EBFp t\u1EE5c gi\u1EA3i \u0111\u1EC1!"));
+        } else {
+          reject(err);
+        }
+      }
     });
   }
 };
