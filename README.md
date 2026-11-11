@@ -1,12 +1,12 @@
-# QuizLens AI 🔍⚡
+# QuizLens AI 
 
 > Tiện ích mở rộng Chrome tự động nhận diện câu hỏi trắc nghiệm (A, B, C, D hoặc Đúng/Sai) ngay khi bôi đen và hiển thị đáp án bằng AI miễn phí.
 >
-> 💡 **Người dùng CHỈ CẦN tải Extension, KHÔNG cần tải backend, KHÔNG cần cài Node.js!**
+> **Người dùng CHỈ CẦN tải Extension, KHÔNG cần tải backend, KHÔNG cần cài Node.js!**
 
 ---
 
-## 🚀 Cài Đặt Trong 3 Bước (Dành Cho Mọi Người)
+## Cài Đặt Trong 3 Bước (Dành Cho Mọi Người)
 
 ### Bước 1: Tải tiện ích
 - Tải tệp nén tiện ích: **[`quizlens-ai-extension.zip`](quizlens-ai-extension.zip)** (chỉ 47 KB).
@@ -24,10 +24,6 @@
 2. Mở bất kỳ trang thi nào, **bôi đen câu hỏi** kèm các đáp án và thả chuột ra: Đáp án sẽ tự động bật lên ngay tức thì!
 
 ---
-
-## 🌐 Backend Serverless (Vercel)
-Hệ thống máy chủ xử lý online đã được deploy sẵn sàng 24/7 tại:  
-`https://quizlens-ai-omega.vercel.app`
 
 Thư mục `backend/` trong kho mã nguồn này chỉ dành cho lập trình viên muốn tham khảo kiến trúc hoặc tự deploy máy chủ riêng.
 
