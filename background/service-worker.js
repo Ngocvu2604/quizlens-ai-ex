@@ -14,13 +14,33 @@ var DEFAULT_SETTINGS = {
 };
 
 // src/background/direct-ai.ts
-var SYSTEM_PROMPT = `You are QuizLens AI, an expert examination solver.
-Analyze the multiple-choice question and options, and identify the single most accurate option.
+var SYSTEM_PROMPT = `You are QuizLens AI, an expert examination and quiz solver.
+Your task is to analyze questions of diverse formats and accurately determine the correct answer.
+
+QUESTION FORMAT GUIDELINES:
+1. Multiple-choice (Single option):
+   - Choose the single most accurate letter: "A", "B", "C", "D", "E"...
+2. Binary / True-False (2 options: \u0110\xFAng/Sai, True/False, C\xF3/Kh\xF4ng, Yes/No):
+   - Choose "A" or "B" (or "\u0110\xFAng" / "Sai").
+3. Multi-select (Tick / Checkbox / "Ch\u1ECDn c\xE1c \u0111\xE1p \xE1n \u0111\xFAng", "Ch\u1ECDn 2 \u0111\xE1p \xE1n..."):
+   - Return ALL correct option letters separated by commas, e.g. "A, C" or "A, B, D".
+   - In "answerText", list the content of the selected options.
+4. Fill-in-the-blank (\u0110i\u1EC1n v\xE0o \xF4 tr\u1ED1ng: ..., ___, [...], (...)):
+   - If options (A, B, C, D) are provided: Choose the best option letter.
+   - If NO options are provided (open-ended fill-in-the-blank): Put the exact missing word/phrase in "answer" (e.g. "54", "L\u1EE5c l\u1EA1p", "Paris"), and the full completed sentence in "answerText".
+5. Unlabeled / Numbered options:
+   - If options were numbered 1, 2, 3, 4, they are mapped to A, B, C, D. Choose the corresponding letter.
+6. Direct questions without options (Ch\u1EC9 c\xF3 c\xE2u h\u1ECFi, kh\xF4ng c\xF3 \u0111\xE1p \xE1n l\u1EF1a ch\u1ECDn):
+   - Determine the correct answer directly.
+   - Put ONLY the most CONCISE, DIRECT answer in "answer" (e.g. "H\xE0 N\u1ED9i", "5 cm", "Nitrogen (N2)", "object", "1954", "William Shakespeare"). Keep it strictly to the core answer word, number, or key term.
+   - In "answerText", provide a brief 1-sentence explanation.
+
+RESPONSE SCHEMA:
 Return ONLY raw JSON with no markdown wrapping:
 {
   "status": "SUCCESS",
-  "answer": "A" | "B" | "C" | "D" | "E",
-  "answerText": "<exact text of option>",
+  "answer": "<Letter(s) e.g. 'A', 'B', 'A, C' OR concise direct answer for questions without options>",
+  "answerText": "<exact text of option(s) or brief 1-sentence explanation>",
   "confidence": 0.95
 }
 If ambiguous or cannot determine, return:
@@ -30,17 +50,39 @@ If ambiguous or cannot determine, return:
   "answerText": null,
   "confidence": 0
 }`;
-function buildPrompt(question, options) {
-  const optionsText = Object.entries(options).filter(([_, val]) => typeof val === "string" && val.trim().length > 0).map(([key, val]) => `${key}. ${val}`).join("\n");
-  return `${SYSTEM_PROMPT}
-
-C\xC2U H\u1ECEI:
-${question}
+function buildUserContent(question, options, questionType) {
+  const optionsEntries = Object.entries(options).filter(
+    ([_, val]) => typeof val === "string" && val.trim().length > 0
+  );
+  let optionsText = "";
+  if (optionsEntries.length > 0) {
+    optionsText = optionsEntries.map(([key, val]) => `${key}. ${val}`).join("\n");
+  }
+  let text = `C\xC2U H\u1ECEI:
+${question}`;
+  if (questionType) {
+    text += `
+[Lo\u1EA1i c\xE2u h\u1ECFi: ${questionType}]`;
+  }
+  if (optionsText) {
+    text += `
 
 C\xC1C PH\u01AF\u01A0NG \xC1N:
-${optionsText}
+${optionsText}`;
+  } else {
+    text += `
+
+(C\xE2u h\u1ECFi tr\u1EF1c ti\u1EBFp kh\xF4ng c\xF3 ph\u01B0\u01A1ng \xE1n l\u1EF1a ch\u1ECDn s\u1EB5n. Y\xCAU C\u1EA6U: H\xE3y tr\u1EA3 v\u1EC1 \u0111\xE1p \xE1n TH\u1EACT NG\u1EAEN G\u1ECCN (ch\u1EC9 t\u1EEB kh\xF3a, t\xEAn, con s\u1ED1 ho\u1EB7c k\u1EBFt qu\u1EA3 ch\xEDnh x\xE1c) v\xE0o tr\u01B0\u1EDDng "answer" v\xE0 gi\u1EA3i th\xEDch ng\u1EAFn 1 c\xE2u v\xE0o "answerText".)`;
+  }
+  text += `
 
 Tr\u1EA3 v\u1EC1 duy nh\u1EA5t \u0111\u1ECBnh d\u1EA1ng JSON:`;
+  return text;
+}
+function buildPrompt(question, options, questionType) {
+  return `${SYSTEM_PROMPT}
+
+${buildUserContent(question, options, questionType)}`;
 }
 function parseJsonResult(raw) {
   if (!raw) return { status: "UNKNOWN", answer: null, answerText: null, confidence: 0 };
@@ -53,21 +95,28 @@ function parseJsonResult(raw) {
   cleaned = cleaned.replace(/,\s*([\}\]])/g, "$1");
   try {
     const parsed = JSON.parse(cleaned);
-    const letter = typeof parsed.answer === "string" ? parsed.answer.toUpperCase().trim() : null;
-    if (letter && ["A", "B", "C", "D", "E"].includes(letter)) {
+    let rawAnswer = parsed.answer != null ? String(parsed.answer).trim() : null;
+    if (rawAnswer && /^[a-hA-H](?:[\s,;]+[a-hA-H])*$/.test(rawAnswer)) {
+      rawAnswer = rawAnswer.toUpperCase().replace(/\s*[,;]\s*/g, ", ");
+    }
+    if (rawAnswer) {
       return {
         status: "SUCCESS",
-        answer: letter,
+        answer: rawAnswer,
         answerText: parsed.answerText || null,
         confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.95
       };
     }
   } catch (e) {
-    const match = raw.match(/"answer"\s*:\s*"([A-E])"/i);
+    const match = raw.match(/"answer"\s*:\s*"([^"]+)"/i);
     if (match) {
+      let letter = match[1].trim();
+      if (/^[a-hA-H](?:[\s,;]+[a-hA-H])*$/.test(letter)) {
+        letter = letter.toUpperCase().replace(/\s*[,;]\s*/g, ", ");
+      }
       return {
         status: "SUCCESS",
-        answer: match[1].toUpperCase(),
+        answer: letter,
         answerText: null,
         confidence: 0.8
       };
@@ -75,8 +124,8 @@ function parseJsonResult(raw) {
   }
   return { status: "UNKNOWN", answer: null, answerText: null, confidence: 0 };
 }
-async function solveWithGeminiDirect(question, options, apiKey, modelName = "gemini-2.0-flash") {
-  const prompt = buildPrompt(question, options);
+async function solveWithGeminiDirect(question, options, apiKey, modelName = "gemini-2.0-flash", questionType) {
+  const prompt = buildPrompt(question, options, questionType);
   const candidateModels = [
     modelName,
     "gemini-2.0-flash",
@@ -143,7 +192,7 @@ async function getGroqLiveModels(apiKey) {
   }
   return [];
 }
-async function solveWithGroqDirect(question, options, apiKey, modelName = "llama-3.3-70b-versatile") {
+async function solveWithGroqDirect(question, options, apiKey, modelName = "llama-3.3-70b-versatile", questionType) {
   const cleanKey = (apiKey || "").trim();
   if (!cleanKey) {
     throw new Error("Ch\u01B0a c\xF3 Groq API Key. Vui l\xF2ng nh\u1EADp key trong Popup!");
@@ -163,14 +212,7 @@ async function solveWithGroqDirect(question, options, apiKey, modelName = "llama
       "llama-3.1-8b-instant"
     );
   }
-  const optionsText = Object.entries(options).filter(([_, val]) => typeof val === "string" && val.trim().length > 0).map(([key, val]) => `${key}. ${val}`).join("\n");
-  const userContent = `C\xC2U H\u1ECEI:
-${question}
-
-C\xC1C PH\u01AF\u01A0NG \xC1N:
-${optionsText}
-
-Tr\u1EA3 v\u1EC1 duy nh\u1EA5t \u0111\u1ECBnh d\u1EA1ng JSON:`;
+  const userContent = buildUserContent(question, options, questionType);
   let lastError = "";
   for (const model of candidateModels) {
     try {
@@ -225,8 +267,8 @@ Tr\u1EA3 v\u1EC1 duy nh\u1EA5t \u0111\u1ECBnh d\u1EA1ng JSON:`;
   }
   throw new Error(lastError || "Kh\xF4ng th\u1EC3 k\u1EBFt n\u1ED1i \u0111\u1EBFn Groq API");
 }
-async function solveWithOpenRouterDirect(question, options, apiKey, modelName = "meta-llama/llama-3.3-70b-instruct:free") {
-  const prompt = buildPrompt(question, options);
+async function solveWithOpenRouterDirect(question, options, apiKey, modelName = "meta-llama/llama-3.3-70b-instruct:free", questionType) {
+  const prompt = buildPrompt(question, options, questionType);
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -252,19 +294,12 @@ async function solveWithOpenRouterDirect(question, options, apiKey, modelName = 
   result.provider = `openrouter (${modelName})`;
   return result;
 }
-async function solveWithOpenAIDirect(question, options, apiKey, modelName = "gpt-4o-mini") {
+async function solveWithOpenAIDirect(question, options, apiKey, modelName = "gpt-4o-mini", questionType) {
   const cleanKey = (apiKey || "").trim();
   if (!cleanKey) {
     throw new Error("Ch\u01B0a c\xF3 OpenAI API Key. Vui l\xF2ng nh\u1EADp key trong Popup!");
   }
-  const optionsText = Object.entries(options).filter(([_, val]) => typeof val === "string" && val.trim().length > 0).map(([key, val]) => `${key}. ${val}`).join("\n");
-  const userContent = `C\xC2U H\u1ECEI:
-${question}
-
-C\xC1C PH\u01AF\u01A0NG \xC1N:
-${optionsText}
-
-Tr\u1EA3 v\u1EC1 duy nh\u1EA5t \u0111\u1ECBnh d\u1EA1ng JSON:`;
+  const userContent = buildUserContent(question, options, questionType);
   const candidateModels = [modelName || "gpt-4o-mini", "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"];
   const uniqueModels = [...new Set(candidateModels)];
   let lastError = "";
@@ -322,19 +357,12 @@ Tr\u1EA3 v\u1EC1 duy nh\u1EA5t \u0111\u1ECBnh d\u1EA1ng JSON:`;
   }
   throw new Error(lastError || "Kh\xF4ng th\u1EC3 k\u1EBFt n\u1ED1i \u0111\u1EBFn OpenAI API");
 }
-async function solveWithDeepSeekDirect(question, options, apiKey, modelName = "deepseek-chat") {
+async function solveWithDeepSeekDirect(question, options, apiKey, modelName = "deepseek-chat", questionType) {
   const cleanKey = (apiKey || "").trim();
   if (!cleanKey) {
     throw new Error("Ch\u01B0a c\xF3 DeepSeek API Key. Vui l\xF2ng nh\u1EADp key trong Popup!");
   }
-  const optionsText = Object.entries(options).filter(([_, val]) => typeof val === "string" && val.trim().length > 0).map(([key, val]) => `${key}. ${val}`).join("\n");
-  const userContent = `C\xC2U H\u1ECEI:
-${question}
-
-C\xC1C PH\u01AF\u01A0NG \xC1N:
-${optionsText}
-
-Tr\u1EA3 v\u1EC1 duy nh\u1EA5t \u0111\u1ECBnh d\u1EA1ng JSON:`;
+  const userContent = buildUserContent(question, options, questionType);
   const candidateModels = [modelName || "deepseek-chat", "deepseek-chat", "deepseek-reasoner"];
   const uniqueModels = [...new Set(candidateModels)];
   let lastError = "";
@@ -442,29 +470,29 @@ async function solveDirectly(payload, settings) {
   if (provider === "gemini") {
     const key = payload.apiKey || settings.geminiApiKey;
     if (!key) throw new Error("NO_API_KEY");
-    return solveWithGeminiDirect(payload.question, payload.options, key, payload.model || settings.geminiModel);
+    return solveWithGeminiDirect(payload.question, payload.options, key, payload.model || settings.geminiModel, payload.questionType);
   }
   if (provider === "groq") {
     const key = payload.apiKey || settings.groqApiKey;
     if (!key) throw new Error("NO_API_KEY");
     const rawModel = payload.model || settings.groqModel || "llama-3.3-70b-versatile";
     const groqModel = rawModel.includes("mixtral") ? "llama-3.3-70b-versatile" : rawModel;
-    return solveWithGroqDirect(payload.question, payload.options, key, groqModel);
+    return solveWithGroqDirect(payload.question, payload.options, key, groqModel, payload.questionType);
   }
   if (provider === "openai") {
     const key = payload.apiKey || settings.openaiApiKey;
     if (!key) throw new Error("NO_API_KEY");
-    return solveWithOpenAIDirect(payload.question, payload.options, key, payload.model || settings.openaiModel);
+    return solveWithOpenAIDirect(payload.question, payload.options, key, payload.model || settings.openaiModel, payload.questionType);
   }
   if (provider === "deepseek") {
     const key = payload.apiKey || settings.deepseekApiKey;
     if (!key) throw new Error("NO_API_KEY");
-    return solveWithDeepSeekDirect(payload.question, payload.options, key, payload.model || settings.deepseekModel);
+    return solveWithDeepSeekDirect(payload.question, payload.options, key, payload.model || settings.deepseekModel, payload.questionType);
   }
   if (provider === "openrouter") {
     const key = payload.apiKey || settings.openrouterApiKey;
     if (!key) throw new Error("NO_API_KEY");
-    return solveWithOpenRouterDirect(payload.question, payload.options, key, payload.model || settings.openrouterModel);
+    return solveWithOpenRouterDirect(payload.question, payload.options, key, payload.model || settings.openrouterModel, payload.questionType);
   }
   throw new Error(`Nh\xE0 cung c\u1EA5p AI kh\xF4ng h\u1EE3p l\u1EC7: ${provider}`);
 }
@@ -479,6 +507,7 @@ async function solveWithBackend(payload, settings) {
     body: JSON.stringify({
       question: payload.question,
       options: payload.options,
+      questionType: payload.questionType,
       provider: payload.provider || settings.activeProvider,
       model: payload.model,
       apiKey: payload.apiKey

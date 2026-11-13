@@ -1,5 +1,5 @@
 // src/content/dom-extractor.ts
-var EXPECTED_OPTIONS = ["A", "B", "C", "D", "E"];
+var OPTION_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 function extractOptionsFromDOM(selectedQuestionText, range) {
   try {
     let startNode = range.commonAncestorContainer;
@@ -20,6 +20,7 @@ function extractOptionsFromDOM(selectedQuestionText, range) {
           return {
             question: selectedQuestionText.trim().length > 5 ? selectedQuestionText.trim() : parsed.question,
             options: parsed.options,
+            questionType: parsed.questionType,
             rawText: containerText
           };
         }
@@ -41,7 +42,6 @@ function extractOptionsFromDOM(selectedQuestionText, range) {
   }
 }
 function extractFromStructuredElements(container, questionText) {
-  const optionsMap = {};
   const candidateSelectors = [
     "li",
     ".option",
@@ -49,62 +49,59 @@ function extractFromStructuredElements(container, questionText) {
     ".answer",
     ".answer-item",
     ".quiz-option",
-    "label",
+    ".cau-tra-loi",
+    ".dapan",
     ".form-check",
-    'div[role="radio"]'
+    "label",
+    'div[role="radio"]',
+    'div[role="checkbox"]'
   ];
+  const hasCheckboxes = container.querySelectorAll('input[type="checkbox"], [role="checkbox"]').length >= 2;
   for (const selector of candidateSelectors) {
     const elements = Array.from(container.querySelectorAll(selector));
-    if (elements.length >= 4) {
+    if (elements.length >= 2 && elements.length <= 12) {
       const foundOptions = {};
       for (const el of elements) {
         const text = normalizeText(el.innerText || el.textContent || "");
-        const match = text.match(/^[\(\[]?([A-Da-d])[\)\].:\-\s]\s*(.*)$/s);
+        const match = text.match(/^[\(\[]?([A-Ha-h])[\)\].:\-\s]\s*(.*)$/s);
         if (match) {
           const letter = match[1].toUpperCase();
           const content = match[2].trim();
-          if (content && EXPECTED_OPTIONS.includes(letter)) {
+          if (content && OPTION_LETTERS.includes(letter)) {
             foundOptions[letter] = content;
           }
         }
       }
       if (foundOptions.A && foundOptions.B) {
+        const count = Object.keys(foundOptions).length;
+        const qType = hasCheckboxes ? "MULTI_SELECT" : detectQuestionType(questionText, count);
         return {
           question: questionText.trim(),
-          options: {
-            A: foundOptions.A,
-            B: foundOptions.B,
-            ...foundOptions.C ? { C: foundOptions.C } : {},
-            ...foundOptions.D ? { D: foundOptions.D } : {},
-            ...foundOptions.E ? { E: foundOptions.E } : {}
-          }
+          options: foundOptions,
+          questionType: qType
         };
       }
     }
   }
-  const radioLabels = Array.from(container.querySelectorAll("label"));
-  if (radioLabels.length >= 2 && radioLabels.length <= 5) {
-    const letters = ["A", "B", "C", "D", "E"];
+  const inputLabels = Array.from(container.querySelectorAll("label, .form-check-label, .custom-control-label"));
+  if (inputLabels.length >= 2 && inputLabels.length <= 8) {
     const autoMapped = {};
     let allValid = true;
-    for (let i = 0; i < radioLabels.length; i++) {
-      const text = normalizeText(radioLabels[i].innerText || radioLabels[i].textContent || "").replace(/^[A-Ea-e][\)\].:\-]\s*/, "").trim();
+    for (let i = 0; i < inputLabels.length && i < OPTION_LETTERS.length; i++) {
+      const text = normalizeText(inputLabels[i].innerText || inputLabels[i].textContent || "").replace(/^[\(\[]?[A-Ha-h1-8][\)\].:\-\s]\s*/, "").trim();
       if (!text) {
         allValid = false;
         break;
       }
-      autoMapped[letters[i]] = text;
+      autoMapped[OPTION_LETTERS[i]] = text;
     }
     if (allValid && autoMapped.A && autoMapped.B) {
+      const count = Object.keys(autoMapped).length;
+      const qType = hasCheckboxes ? "MULTI_SELECT" : detectQuestionType(questionText, count);
       return {
         question: questionText.trim(),
-        options: {
-          A: autoMapped.A,
-          B: autoMapped.B,
-          ...autoMapped.C ? { C: autoMapped.C } : {},
-          ...autoMapped.D ? { D: autoMapped.D } : {},
-          ...autoMapped.E ? { E: autoMapped.E } : {}
-        }
+        options: autoMapped,
+        questionType: qType
       };
     }
   }
@@ -130,6 +127,7 @@ ${collectedTextLines.join("\n")}`;
       return {
         question: questionText.trim(),
         options: parsed.options,
+        questionType: parsed.questionType,
         rawText: fullText
       };
     }
@@ -138,15 +136,15 @@ ${collectedTextLines.join("\n")}`;
 }
 
 // src/content/question-detector.ts
-var EXPECTED_OPTIONS2 = ["A", "B", "C", "D", "E"];
-var OPTION_PREFIX_REGEX = /(?:^|[\r\n]+|[•\*\-\–\—\+·]\s*|\s{2,}|\t)(?:[\(\[]?([A-Ea-e])[\)\].:\-]\s*)|(?:\s+)([A-Ea-e])[\.:\-]\s*/g;
+var OPTION_LETTERS2 = ["A", "B", "C", "D", "E", "F", "G", "H"];
+var OPTION_PREFIX_REGEX = /(?:^|[\r\n]+|[•\*\-\–\—\+·▪▫]\s*|\s{2,}|\t)(?:[\(\[]?([A-Ha-h])[\)\].:\-\/]\s*)|(?:\s+)([A-Ha-h])[\.:\-\/]\s*/g;
 function normalizeText(text) {
   if (!text) return "";
   return text.replace(/\u00a0/g, " ").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 }
 function isDisqualifiedNonQuestion(text) {
   const trimmed = text.trim();
-  if (trimmed.length < 15) return true;
+  if (trimmed.length < 5) return true;
   const noisePatterns = [
     /^(menu|navigation|trang chủ|home|contact|giới thiệu|about us|footer|bản quyền|copyright)/i,
     /^(điều khoản|chính sách bảo mật|terms of service|privacy policy)/i,
@@ -154,11 +152,24 @@ function isDisqualifiedNonQuestion(text) {
   ];
   return noisePatterns.some((pattern) => pattern.test(trimmed));
 }
-function parseQuestionFromText(rawText) {
-  const text = normalizeText(rawText);
-  if (!text || isDisqualifiedNonQuestion(text)) {
-    return null;
+function detectQuestionType(text, optionsCount = 0) {
+  const lower = text.toLowerCase();
+  const multiSelectRegex = /(?:chọn\s+(?:các|những|nhiều|tất\s+cả|hai|ba|bốn|\d+)\s+(?:đáp\s+án|phương\s+án|câu|khẳng\s+định|ý)|các\s+(?:đáp\s+án|khẳng\s+định|phương\s+án)\s+(?:nào\s+)?đúng|select\s+all(?:\s+that\s+apply)?|choose\s+all|which\s+of\s+the\s+following\s+are\s+correct|những\s+câu\s+nào\s+sau\s+đây\s+đúng|tick\s+vào|chọn\s+các|đánh\s+dấu\s+vào)/i;
+  if (multiSelectRegex.test(lower) || /[☑☐]|\bcheckbox\b/i.test(text)) {
+    return "MULTI_SELECT";
   }
+  const blankRegex = /(?:\.{3,}|_{2,}|…|\[\s*(?:\.{2,}|_{2,}|…|\s*)\s*\]|\(\s*(?:\.{2,}|_{2,}|…|\s*)\s*\)|điền\s+(?:từ|vào\s+chỗ\s+trống|vào\s+ô\s+trống|khuyết)|chọn\s+từ\s+thích\s+hợp|fill\s+in\s+the\s+blank|complete\s+the\s+sentence|missing\s+word)/i;
+  if (blankRegex.test(text)) {
+    return "FILL_IN_BLANK";
+  }
+  if (optionsCount === 2) {
+    if (/(?:đúng|sai|true|false|yes|no|có|không)/i.test(lower)) {
+      return "BINARY";
+    }
+  }
+  return "MULTIPLE_CHOICE";
+}
+function tryParseLetterOptions(text) {
   const matches = [];
   const regex = new RegExp(OPTION_PREFIX_REGEX);
   let match;
@@ -173,9 +184,7 @@ function parseQuestionFromText(rawText) {
       fullMatchLength: match[0].trimStart().length
     });
   }
-  if (matches.length < 2) {
-    return null;
-  }
+  if (matches.length < 2) return null;
   const lastSeenIndexByLetter = /* @__PURE__ */ new Map();
   for (let i = 0; i < matches.length; i++) {
     lastSeenIndexByLetter.set(matches[i].letter, i);
@@ -188,9 +197,7 @@ function parseQuestionFromText(rawText) {
   }
   const firstOptionIndex = validMatches[0].index;
   const questionPart = text.slice(0, firstOptionIndex).trim();
-  if (questionPart.length < 5) {
-    return null;
-  }
+  if (questionPart.length < 3) return null;
   const optionsMap = {};
   for (let i = 0; i < validMatches.length; i++) {
     const current = validMatches[i];
@@ -198,31 +205,259 @@ function parseQuestionFromText(rawText) {
     const startIndex = current.index + current.fullMatchLength;
     const endIndex = next ? next.index : text.length;
     const content = text.slice(startIndex, endIndex).trim();
-    if (!content) {
-      return null;
-    }
-    if (EXPECTED_OPTIONS2.includes(current.letter)) {
-      optionsMap[current.letter] = content;
-    }
+    if (!content) return null;
+    optionsMap[current.letter] = content;
   }
-  if (!optionsMap.A || !optionsMap.B) {
-    return null;
-  }
+  if (!optionsMap.A || !optionsMap.B) return null;
+  const optionsCount = Object.keys(optionsMap).length;
+  const questionType = detectQuestionType(text, optionsCount);
   return {
     question: questionPart,
-    options: {
-      A: optionsMap.A,
-      B: optionsMap.B,
-      ...optionsMap.C ? { C: optionsMap.C } : {},
-      ...optionsMap.D ? { D: optionsMap.D } : {},
-      ...optionsMap.E ? { E: optionsMap.E } : {}
-    },
+    options: optionsMap,
+    questionType,
     rawText: text
   };
 }
+function tryParseBinaryOptions(text) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length >= 2) {
+    const last1 = lines[lines.length - 1];
+    const last2 = lines[lines.length - 2];
+    const isBinaryPair = (a, b) => {
+      const cleanA = a.replace(/^[\(\[\-•\*\d+\.\]\s]+/, "").trim().toLowerCase();
+      const cleanB = b.replace(/^[\(\[\-•\*\d+\.\]\s]+/, "").trim().toLowerCase();
+      if (cleanA === "\u0111\xFAng" && cleanB === "sai" || cleanA === "sai" && cleanB === "\u0111\xFAng") return ["\u0110\xFAng", "Sai"];
+      if (cleanA === "true" && cleanB === "false" || cleanA === "false" && cleanB === "true") return ["True", "False"];
+      if (cleanA === "yes" && cleanB === "no" || cleanA === "no" && cleanB === "yes") return ["Yes", "No"];
+      if (cleanA === "c\xF3" && cleanB === "kh\xF4ng" || cleanA === "kh\xF4ng" && cleanB === "c\xF3") return ["C\xF3", "Kh\xF4ng"];
+      return null;
+    };
+    const pair = isBinaryPair(last2, last1);
+    if (pair) {
+      const questionPart = lines.slice(0, lines.length - 2).join("\n").trim();
+      if (questionPart.length >= 3) {
+        return {
+          question: questionPart,
+          options: { A: pair[0], B: pair[1] },
+          questionType: "BINARY",
+          rawText: text
+        };
+      }
+    }
+  }
+  const inlineBinaryRegex = /(.*?)(?:[\:\?\-—\n]\s*)?(?:\[\s*\]|\(s*\)|\🔘|\⚪)?\s*(đúng|true|yes|có)\s*(?:\/|\||\\|\s{2,}|\svà\s|\shoặc\s)\s*(?:\[\s*\]|\(s*\)|\🔘|\⚪)?\s*(sai|false|no|không)\s*$/i;
+  const inlineMatch = text.match(inlineBinaryRegex);
+  if (inlineMatch && inlineMatch[1]?.trim().length >= 3) {
+    const questionPart = inlineMatch[1].trim();
+    const optA = inlineMatch[2].trim();
+    const optB = inlineMatch[3].trim();
+    return {
+      question: questionPart,
+      options: {
+        A: optA.charAt(0).toUpperCase() + optA.slice(1).toLowerCase(),
+        B: optB.charAt(0).toUpperCase() + optB.slice(1).toLowerCase()
+      },
+      questionType: "BINARY",
+      rawText: text
+    };
+  }
+  return null;
+}
+function tryParseNumberedOptions(text) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length < 3) return null;
+  const numberedRegex = /^[\(\[]?([1-8])[\)\].:\-\s]\s*(.+)$/;
+  let firstNumberedIdx = -1;
+  const numbersFound = [];
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(numberedRegex);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (firstNumberedIdx === -1 && num === 1 && i > 0) {
+        firstNumberedIdx = i;
+      }
+      if (firstNumberedIdx !== -1) {
+        numbersFound.push({ num, content: match[2].trim() });
+      }
+    } else if (firstNumberedIdx !== -1) {
+      if (numbersFound.length > 0) {
+        numbersFound[numbersFound.length - 1].content += `
+${lines[i]}`;
+      }
+    }
+  }
+  if (numbersFound.length >= 2 && numbersFound[0].num === 1 && numbersFound[1].num === 2) {
+    const questionPart = lines.slice(0, firstNumberedIdx).join("\n").trim();
+    if (questionPart.length >= 3) {
+      const optionsMap = {};
+      for (let i = 0; i < numbersFound.length && i < OPTION_LETTERS2.length; i++) {
+        optionsMap[OPTION_LETTERS2[i]] = numbersFound[i].content;
+      }
+      return {
+        question: questionPart,
+        options: optionsMap,
+        questionType: detectQuestionType(text, numbersFound.length),
+        rawText: text
+      };
+    }
+  }
+  return null;
+}
+function tryParseRomanOptions(text) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length < 3) return null;
+  const romanRegex = /^[\(\[]?(I|II|III|IV|V|VI)[\)\].:\-\s]\s*(.+)$/i;
+  const romanMap = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6 };
+  let firstRomanIdx = -1;
+  const romansFound = [];
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(romanRegex);
+    if (match) {
+      const val = romanMap[match[1].toLowerCase()];
+      if (val) {
+        if (firstRomanIdx === -1 && val === 1 && i > 0) {
+          firstRomanIdx = i;
+        }
+        if (firstRomanIdx !== -1) {
+          romansFound.push({ val, content: match[2].trim() });
+        }
+      }
+    }
+  }
+  if (romansFound.length >= 2 && romansFound[0].val === 1 && romansFound[1].val === 2) {
+    const questionPart = lines.slice(0, firstRomanIdx).join("\n").trim();
+    if (questionPart.length >= 3) {
+      const optionsMap = {};
+      for (let i = 0; i < romansFound.length && i < OPTION_LETTERS2.length; i++) {
+        optionsMap[OPTION_LETTERS2[i]] = romansFound[i].content;
+      }
+      return {
+        question: questionPart,
+        options: optionsMap,
+        questionType: detectQuestionType(text, romansFound.length),
+        rawText: text
+      };
+    }
+  }
+  return null;
+}
+function tryParseBulletOptions(text) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length < 3) return null;
+  const bulletRegex = /^([•\*\-\–\—\+▪▫☑☐🔘⚪]|\[[\sxX]?\])\s+(.+)$/;
+  let firstBulletIdx = -1;
+  const bulletsFound = [];
+  let isCheckbox = false;
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(bulletRegex);
+    if (match) {
+      if (firstBulletIdx === -1 && i > 0) {
+        firstBulletIdx = i;
+      }
+      if (firstBulletIdx !== -1) {
+        if (/[☑☐]|\s*\[[\sxX]?\]/.test(match[1])) {
+          isCheckbox = true;
+        }
+        bulletsFound.push(match[2].trim());
+      }
+    } else if (firstBulletIdx !== -1) {
+      if (bulletsFound.length > 0) {
+        bulletsFound[bulletsFound.length - 1] += `
+${lines[i]}`;
+      }
+    }
+  }
+  if (bulletsFound.length >= 2 && firstBulletIdx > 0) {
+    const questionPart = lines.slice(0, firstBulletIdx).join("\n").trim();
+    if (questionPart.length >= 3) {
+      const optionsMap = {};
+      for (let i = 0; i < bulletsFound.length && i < OPTION_LETTERS2.length; i++) {
+        optionsMap[OPTION_LETTERS2[i]] = bulletsFound[i];
+      }
+      const inferredType = isCheckbox ? "MULTI_SELECT" : detectQuestionType(text, bulletsFound.length);
+      return {
+        question: questionPart,
+        options: optionsMap,
+        questionType: inferredType,
+        rawText: text
+      };
+    }
+  }
+  return null;
+}
+function tryParsePlainLineOptions(text) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length < 3 || lines.length > 8) return null;
+  const firstLine = lines[0];
+  const candidateOptions = lines.slice(1);
+  const isQuestionLike = /[?:]$/.test(firstLine) || /^(câu\s+\d+|bài\s+\d+|question\s+\d+|đâu\s+là|ai\s+là|khi\s+nào|tại\s+sao|như\s+thế\s+nào|cái\s+gì|hãy\s+cho\s+biết|chọn|tìm|hãy|cho|tính|xác\s+định|trong\s+các|which|what|where|when|why|how|who)/i.test(firstLine);
+  if (!isQuestionLike) return null;
+  const optionsValid = candidateOptions.every((opt) => opt.length > 0 && opt.length < 250 && !opt.endsWith("?"));
+  if (!optionsValid) return null;
+  const optionsMap = {};
+  for (let i = 0; i < candidateOptions.length && i < OPTION_LETTERS2.length; i++) {
+    optionsMap[OPTION_LETTERS2[i]] = candidateOptions[i];
+  }
+  return {
+    question: firstLine,
+    options: optionsMap,
+    questionType: detectQuestionType(text, candidateOptions.length),
+    rawText: text
+  };
+}
+function tryParseFillInTheBlankWithoutOptions(text) {
+  const hasBlank = /(?:\.{3,}|_{2,}|…|\[\s*(?:\.{2,}|_{2,}|…|\s*)\s*\]|\(\s*(?:\.{2,}|_{2,}|…|\s*)\s*\))/i.test(text);
+  const hasKeyword = /(?:điền\s+(?:vào\s+chỗ\s+trống|vào\s+ô\s+trống|từ|khuyết)|chọn\s+từ\s+thích\s+hợp|fill\s+in\s+the\s+blank|complete\s+the\s+sentence)/i.test(text);
+  if ((hasBlank || hasKeyword) && text.trim().length >= 10) {
+    return {
+      question: text.trim(),
+      options: {},
+      questionType: "FILL_IN_BLANK",
+      rawText: text
+    };
+  }
+  return null;
+}
+function isDirectQuestion(text) {
+  const trimmed = text.trim();
+  if (trimmed.length < 6 || trimmed.length > 800) return false;
+  if (isDisqualifiedNonQuestion(trimmed)) return false;
+  const prefixRegex = /^(?:câu|bài|question|task|câu\s+hỏi)\s*\d*[\.:\-]/i;
+  if (prefixRegex.test(trimmed)) return true;
+  if (/[?？]$/.test(trimmed)) return true;
+  const viQuestionEndings = /(?:là\s+gì|như\s+thế\s+nào|bao\s+nhiêu|ở\s+đâu|khi\s+nào|mấy|nào|sao|đúng\s+không|phải\s+không)\s*[?\.:!]*$/i;
+  if (viQuestionEndings.test(trimmed)) return true;
+  const viStarters = /^(?:đâu\s+là|ai\s+là|khi\s+nào|tại\s+sao|như\s+thế\s+nào|cái\s+gì|hãy\s+cho\s+biết|hãy\s+tính|hãy\s+tìm|tính\s+|tìm\s+|giải\s+|xác\s+định\s+|cho\s+biết\s+|thủ\s+đô\s+|năm\s+nào|tác\s+giả\s+|nguyên\s+nhân\s+|kết\s+quả\s+|đoạn\s+mã|ý\s+nghĩa\s+của|cho\s+tam\s+giác|phương\s+trình)/i;
+  if (viStarters.test(trimmed)) return true;
+  const enStarters = /^(?:what|which|where|when|why|how|who|whom|whose|can|could|would|should|is|are|do|does|did|calculate|find|determine|explain|evaluate|define)\b/i;
+  if (enStarters.test(trimmed)) return true;
+  if (/[\d\w\)]\s*=\s*[?\.\s]*$/.test(trimmed)) return true;
+  return false;
+}
+function parseQuestionFromText(rawText) {
+  const text = normalizeText(rawText);
+  if (!text || isDisqualifiedNonQuestion(text)) {
+    return null;
+  }
+  const letterResult = tryParseLetterOptions(text);
+  if (letterResult) return letterResult;
+  const binaryResult = tryParseBinaryOptions(text);
+  if (binaryResult) return binaryResult;
+  const numberedResult = tryParseNumberedOptions(text);
+  if (numberedResult) return numberedResult;
+  const romanResult = tryParseRomanOptions(text);
+  if (romanResult) return romanResult;
+  const bulletResult = tryParseBulletOptions(text);
+  if (bulletResult) return bulletResult;
+  const plainResult = tryParsePlainLineOptions(text);
+  if (plainResult) return plainResult;
+  const fillBlankResult = tryParseFillInTheBlankWithoutOptions(text);
+  if (fillBlankResult) return fillBlankResult;
+  return null;
+}
 function detectQuestion(selectionText, selectionRange) {
   const normalized = normalizeText(selectionText);
-  if (!normalized || normalized.length < 5) {
+  if (!normalized || normalized.length < 4) {
     return { isValid: false, data: null, reason: "Selection text too short" };
   }
   const directResult = parseQuestionFromText(normalized);
@@ -241,10 +476,21 @@ function detectQuestion(selectionText, selectionRange) {
       };
     }
   }
+  if (isDirectQuestion(normalized)) {
+    return {
+      isValid: true,
+      data: {
+        question: normalized,
+        options: {},
+        questionType: "SHORT_ANSWER",
+        rawText: normalized
+      }
+    };
+  }
   return {
     isValid: false,
     data: null,
-    reason: "Could not extract 4 valid options (A, B, C, D)"
+    reason: "Kh\xF4ng t\xECm th\u1EA5y c\xE1c ph\u01B0\u01A1ng \xE1n ho\u1EB7c m\u1EABu c\xE2u h\u1ECFi h\u1EE3p l\u1EC7"
   };
 }
 
@@ -350,12 +596,33 @@ var ResultPopup = class {
   showResult(result, rect, autoCopy = false) {
     this.preparePopup(rect);
     if (!this.popupEl) return;
-    this.currentAnswerText = `${result.answer ? result.answer + ". " : ""}${result.answerText || ""}`.trim();
-    if (autoCopy && this.currentAnswerText) {
-      navigator.clipboard?.writeText(this.currentAnswerText).catch(() => {
+    const qType = result.questionType;
+    let sectionLabel = "\u0110\xC1P \xC1N CH\xCDNH X\xC1C";
+    let typeBadgeHtml = "";
+    if (qType === "MULTI_SELECT") {
+      sectionLabel = "CH\u1ECCN NHI\u1EC0U \u0110\xC1P \xC1N";
+      typeBadgeHtml = '<span class="quizlens-type-tag">Ch\u1ECDn nhi\u1EC1u</span>';
+    } else if (qType === "BINARY") {
+      sectionLabel = "C\xC2U H\u1ECEI \u0110\xDANG / SAI";
+      typeBadgeHtml = '<span class="quizlens-type-tag">\u0110\xFAng/Sai</span>';
+    } else if (qType === "FILL_IN_BLANK") {
+      sectionLabel = "T\u1EEA C\u1EA6N \u0110I\u1EC0N V\xC0O CH\u1ED6 TR\u1ED0NG";
+      typeBadgeHtml = '<span class="quizlens-type-tag">\u0110i\u1EC1n khuy\u1EBFt</span>';
+    } else if (qType === "SHORT_ANSWER") {
+      sectionLabel = "\u0110\xC1P \xC1N NG\u1EAEN G\u1ECCN";
+      typeBadgeHtml = '<span class="quizlens-type-tag">Tr\u1EA3 l\u1EDDi nhanh</span>';
+    }
+    const answerStr = (result.answer || "").trim();
+    const isShortBadge = answerStr.length > 0 && answerStr.length <= 6;
+    const badgeText = isShortBadge ? answerStr : "\u2713";
+    if (autoCopy && answerStr) {
+      const copyVal = isShortBadge && result.answerText ? `${answerStr}. ${result.answerText}` : answerStr || result.answerText || "";
+      navigator.clipboard?.writeText(copyVal).catch(() => {
       });
     }
+    this.currentAnswerText = isShortBadge && result.answerText ? `${answerStr}. ${result.answerText}` : answerStr || result.answerText || "";
     const confidencePercent = Math.round((result.confidence || 0.95) * 100);
+    const showExplanation = Boolean(result.answerText && result.answerText.trim() !== answerStr);
     this.popupEl.innerHTML = `
       <div class="quizlens-header">
         <div class="quizlens-brand">
@@ -364,15 +631,19 @@ var ResultPopup = class {
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
           QuizLens AI
+          ${typeBadgeHtml}
         </div>
         <button class="quizlens-close-btn" title="\u0110\xF3ng">&times;</button>
       </div>
       <div class="quizlens-body">
         <div class="quizlens-result">
-          <div class="quizlens-section-label">\u0110\xC1P \xC1N CH\xCDNH X\xC1C</div>
+          <div class="quizlens-section-label">${sectionLabel}</div>
           <div class="quizlens-answer-row">
-            <div class="quizlens-letter-badge">${result.answer || "?"}</div>
-            <div class="quizlens-answer-text">${this.escapeHtml(result.answerText || "Kh\xF4ng c\xF3 m\xF4 t\u1EA3")}</div>
+            <div class="quizlens-letter-badge ${isShortBadge ? "" : "quizlens-badge-icon"}">${badgeText}</div>
+            <div class="quizlens-answer-content">
+              ${!isShortBadge && answerStr ? `<div class="quizlens-prominent-word">${this.escapeHtml(answerStr)}</div>` : ""}
+              ${showExplanation ? `<div class="quizlens-answer-text">${this.escapeHtml(result.answerText)}</div>` : isShortBadge && result.answerText ? `<div class="quizlens-answer-text">${this.escapeHtml(result.answerText)}</div>` : ""}
+            </div>
           </div>
           <div class="quizlens-meta-bar">
             <span class="quizlens-confidence">\u0110\u1ED9 tin c\u1EADy: ${confidencePercent}%</span>
@@ -594,7 +865,10 @@ var SelectionController = class {
         this.popup.showError("Kh\xF4ng nh\u1EADn \u0111\u01B0\u1EE3c ph\u1EA3n h\u1ED3i t\u1EEB AI", rect);
         return;
       }
-      if (answerResult.status === "SUCCESS" && answerResult.answer) {
+      if (answerResult.status === "SUCCESS" && (answerResult.answer || answerResult.answerText)) {
+        if (!answerResult.questionType && detection.data.questionType) {
+          answerResult.questionType = detection.data.questionType;
+        }
         this.popup.showResult(answerResult, rect, this.settings.autoCopy);
       } else {
         this.popup.showUnknown(rect, "AI kh\xF4ng t\xECm \u0111\u01B0\u1EE3c \u0111\xE1p \xE1n ch\u1EAFc ch\u1EAFn cho c\xE2u h\u1ECFi n\xE0y.");
@@ -620,7 +894,8 @@ var SelectionController = class {
             type: "ANALYZE_QUESTION",
             payload: {
               question: questionData.question,
-              options: questionData.options
+              options: questionData.options,
+              questionType: questionData.questionType
             }
           },
           (response) => {

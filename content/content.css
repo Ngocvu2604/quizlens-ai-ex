@@ -140,18 +140,54 @@
   gap: 10px;
 }
 
+.quizlens-type-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--ql-primary);
+  border-radius: 4px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .quizlens-letter-badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
+  min-width: 36px;
   height: 36px;
+  padding: 0 8px;
   background: var(--ql-primary);
   color: #FFFFFF;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   border-radius: 6px;
   flex-shrink: 0;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.quizlens-badge-icon {
+  font-size: 18px;
+}
+
+.quizlens-answer-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.quizlens-prominent-word {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ql-primary);
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 .quizlens-answer-text {
